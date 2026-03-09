@@ -1,27 +1,54 @@
-from flask import Blueprint, jsonify, request
-from database.models import db, Product
+from flask import Blueprint, jsonify
+from database.db import get_db_connection
 
-product_routes = Blueprint("products", __name__)
+product_bp = Blueprint("product_bp", __name__)
 
-# Get all products
-@product_routes.route("/products", methods=["GET"])
+# GET ALL PRODUCTS
+@product_bp.route("/", methods=["GET"])
 def get_products():
-    products = Product.query.all()
-    return jsonify([p.to_dict() for p in products])
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    products = cursor.execute("SELECT * FROM product").fetchall()
+
+    result = []
+    for p in products:
+        result.append({
+            "id": p["id"],
+            "name": p["name"],
+            "price": p["price"],
+            "size": p["size"],
+            "brand": p["brand"],
+            "description": p["description"],
+            "image_url": p["image_url"]
+        })
+
+    conn.close()
+    return jsonify({"status": "success", "products": result})
 
 
-# Add a new product
-@product_routes.route("/products", methods=["POST"])
-def add_product():
-    data = request.json
-    new_product = Product(
-        name=data['name'],
-        price=data['price'],
-        size=data['size'],
-        brand=data['brand'],
-        description=data['description'],
-        image_url=data['image_url']
-    )
-    db.session.add(new_product)
-    db.session.commit()
-    return jsonify({"message": "Product added successfully!"})
+# GET SINGLE PRODUCT
+@product_bp.route("/<int:product_id>", methods=["GET"])
+def get_product(product_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    product = cursor.execute(
+        "SELECT * FROM product WHERE id=?",
+        (product_id,)
+    ).fetchone()
+
+    conn.close()
+
+    if product:
+        return jsonify({
+            "id": product["id"],
+            "name": product["name"],
+            "price": product["price"],
+            "size": product["size"],
+            "brand": product["brand"],
+            "description": product["description"],
+            "image_url": product["image_url"]
+        })
+
+    return jsonify({"error": "Product not found"}), 404
